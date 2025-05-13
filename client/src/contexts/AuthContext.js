@@ -1,85 +1,107 @@
-import React, { createContext, useState, useEffect } from 'react';
-import { loginUser, registerUser, getCurrentUser, loginWithGoogle } from '../services/authService';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import axios from 'axios';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
+  // Configure axios to use the token
   useEffect(() => {
-    const checkUserLoggedIn = async () => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      localStorage.setItem('token', token);
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+      localStorage.removeItem('token');
+    }
+  }, [token]);
+
+  // Load user data when token changes
+  useEffect(() => {
+    async function loadUser() {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          const userData = await getCurrentUser();
-          setCurrentUser(userData);
+        const response = await axios.get('/api/user');
+        setCurrentUser(response.data);
+      } catch (error) {
+        console.error('Error loading user:', error);
+        // If token is invalid, clear it
+        if (error.response && error.response.status === 401) {
+          setToken(null);
         }
-      } catch (err) {
-        console.error('Error checking authentication:', err);
-        localStorage.removeItem('token');
       } finally {
         setLoading(false);
       }
-    };
+    }
 
-    checkUserLoggedIn();
-  }, []);
+    loadUser();
+  }, [token]);
 
+  // Login function
   const login = async (email, password) => {
-    try {
-      setError(null);
-      const data = await loginUser(email, password);
-      localStorage.setItem('token', data.token);
-      setCurrentUser(data.user);
-      return data.user;
-    } catch (err) {
-      setError(err.message || 'Failed to login');
-      throw err;
-    }
+    const response = await axios.post('/api/login', { email, password });
+    setToken(response.data.access_token);
+    setCurrentUser(response.data.user);
+    return response.data.user;
   };
 
-  const googleLogin = async (tokenId) => {
-    try {
-      setError(null);
-      const data = await loginWithGoogle(tokenId);
-      localStorage.setItem('token', data.token);
-      setCurrentUser(data.user);
-      return data.user;
-    } catch (err) {
-      setError(err.message || 'Failed to login with Google');
-      throw err;
-    }
+  // Register function
+  const register = async (userData) => {
+    const response = await axios.post('/api/register', userData);
+    setToken(response.data.access_token);
+    setCurrentUser(response.data.user);
+    return response.data.user;
   };
 
-  const register = async (name, email, password) => {
-    try {
-      setError(null);
-      const data = await registerUser(name, email, password);
-      localStorage.setItem('token', data.token);
-      setCurrentUser(data.user);
-      return data.user;
-    } catch (err) {
-      setError(err.message || 'Failed to register');
-      throw err;
-    }
+  // Google auth function
+  const googleAuth = async (googleData) => {
+    const response = await axios.post('/api/google-auth', {
+      email: googleData.email,
+      name: googleData.name
+    });
+    setToken(response.data.access_token);
+    setCurrentUser(response.data.user);
+    return response.data.user;
   };
 
+  // Logout function
   const logout = () => {
-    localStorage.removeItem('token');
+    setToken(null);
     setCurrentUser(null);
+  };
+
+  // Update user function
+  const updateUser = async (userData) => {
+    const response = await axios.put('/api/user', userData);
+    setCurrentUser(response.data);
+    return response.data;
   };
 
   const value = {
     currentUser,
     loading,
-    error,
     login,
-    googleLogin,
     register,
+    googleAuth,
     logout,
+    updateUser,
+    isAuthenticated: !!token
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+}

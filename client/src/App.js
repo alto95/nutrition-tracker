@@ -1,37 +1,52 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+// Import contexts
 import { AuthProvider } from './contexts/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
-import Navbar from './components/Navbar';
+
+// Import layouts
+import MainLayout from './layouts/MainLayout';
+
+// Import pages
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Meals from './pages/Meals';
-import MealDetail from './pages/MealDetail';
-import GlucoseTracker from './pages/GlucoseTracker';
 import Profile from './pages/Profile';
-import './App.css';
+import Meals from './pages/Meals';
+import Recipes from './pages/Recipes';
+import Foods from './pages/Foods';
+import Glucose from './pages/Glucose';
+import NotFound from './pages/NotFound';
+
+// Import guards
+import PrivateRoute from './components/PrivateRoute';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="app">
-          <Navbar />
-          <main className="content">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-              <Route path="/meals" element={<PrivateRoute><Meals /></PrivateRoute>} />
-              <Route path="/meals/:id" element={<PrivateRoute><MealDetail /></PrivateRoute>} />
-              <Route path="/glucose" element={<PrivateRoute><GlucoseTracker /></PrivateRoute>} />
-              <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-            </Routes>
-          </main>
-        </div>
+        <ToastContainer position="top-right" autoClose={3000} />
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Private routes */}
+          <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+            <Route index element={<Home />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="meals" element={<Meals />} />
+            <Route path="recipes" element={<Recipes />} />
+            <Route path="foods" element={<Foods />} />
+            <Route path="glucose" element={<Glucose />} />
+          </Route>
+          
+          {/* Not found route */}
+          <Route path="404" element={<NotFound />} />
+          <Route path="*" element={<Navigate to="/404" replace />} />
+        </Routes>
       </Router>
     </AuthProvider>
   );
